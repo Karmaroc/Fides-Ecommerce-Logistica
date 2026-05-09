@@ -1,0 +1,41 @@
+---
+/**
+ * Container para Monaco Editor (carregado via AMD no index).
+ * Registra snippet em window.__MONACO_EXAMPLES__[instanceId] para o script principal inicializar.
+ */
+interface Props {
+  instanceId: string;
+  code: string;
+  /** Idioma Monaco: typescript | python | php | go | rust | javascript */
+  language: string;
+  readOnly?: boolean;
+}
+
+const { instanceId, code, language, readOnly = true } = Astro.props;
+
+const snippet = { code, language, readOnly };
+/** Evita fechar a tag script se o código contiver "</script>" */
+const snippetJson = JSON.stringify(snippet).replace(/</g, '\\u003c');
+---
+
+<div
+  class="monaco-mount monaco-editor-root"
+  id={`editor-${instanceId}`}
+  data-monaco-id={instanceId}
+  aria-label="Exemplo de código de integração"
+></div>
+
+<script
+  is:inline
+  set:html={`window.__MONACO_EXAMPLES__=window.__MONACO_EXAMPLES__||{};
+window.__MONACO_EXAMPLES__[${JSON.stringify(instanceId)}]=${snippetJson};`}
+></script>
+
+<style>
+  .monaco-editor-root {
+    width: 100%;
+    min-height: 320px;
+    height: min(560px, 62vh);
+    background: #1e1e1e;
+  }
+</style>

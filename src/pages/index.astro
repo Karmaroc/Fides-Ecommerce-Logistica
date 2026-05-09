@@ -1,17 +1,2596 @@
 ---
+// Dados da página
 
+const htmlEscapes: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+};
+
+const languageKeywords: Record<string, string[]> = {
+  TypeScript: [
+    'import', 'type', 'interface', 'const', 'let', 'var', 'export', 'async',
+    'await', 'return', 'new', 'try', 'catch', 'throw', 'if', 'else', 'from',
+    'null', 'undefined', 'true', 'false', 'string', 'number',
+  ],
+  Python: [
+    'from', 'import', 'class', 'def', 'async', 'await', 'if', 'else', 'raise',
+    'return', 'with', 'as', 'try', 'except', 'True', 'False', 'None', 'str',
+    'int', 'float',
+  ],
+  'PHP 8.2': [
+    'declare', 'strict_types', 'readonly', 'class', 'public', 'private',
+    'function', 'array', 'string', 'try', 'catch', 'throw', 'new', 'true',
+    'false', 'return',
+  ],
+  Go: [
+    'package', 'import', 'type', 'struct', 'var', 'func', 'if', 'return',
+    'defer', 'nil', 'string', 'float64', 'int64',
+  ],
+  Rust: [
+    'use', 'struct', 'async', 'fn', 'let', 'mut', 'Result', 'Ok', 'Err',
+    'await', 'match', 'if', 'else', 'pub',
+  ],
+  'Java 21': [
+    'public', 'private', 'final', 'class', 'return', 'new', 'if', 'else',
+    'String', 'void', 'Mono', 'ResponseEntity',
+  ],
+};
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>]/g, (char) => htmlEscapes[char]);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function tokenMarker(index: number): string {
+  let value = index;
+  let name = '';
+
+  do {
+    name = String.fromCharCode(65 + (value % 26)) + name;
+    value = Math.floor(value / 26) - 1;
+  } while (value >= 0);
+
+  return `\uE000${name}\uE001`;
+}
+
+function findCommentStart(line: string, linguagem: string): number {
+  const markers =
+    linguagem === 'Python' ? ['#'] : linguagem === 'PHP 8.2' ? ['//', '#'] : ['//'];
+  let quote: string | null = null;
+  let escaped = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+
+    if (quote) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === '\\') {
+        escaped = true;
+      } else if (char === quote) {
+        quote = null;
+      }
+      continue;
+    }
+
+    if (char === '"' || char === "'" || char === '`') {
+      quote = char;
+      continue;
+    }
+
+    if (markers.some((marker) => line.startsWith(marker, index))) {
+      return index;
+    }
+  }
+
+  return -1;
+}
+
+function highlightCodeLine(rawLine: string, linguagem: string): string {
+  const tokens = new Map<string, string>();
+
+  function stash(value: string, className: string): string {
+    const marker = tokenMarker(tokens.size);
+    tokens.set(marker, `<span class="syntax-${className}">${escapeHtml(value)}</span>`);
+    return marker;
+  }
+
+  const commentStart = findCommentStart(rawLine, linguagem);
+  const comment = commentStart >= 0 ? rawLine.slice(commentStart) : '';
+  let line = commentStart >= 0 ? rawLine.slice(0, commentStart) : rawLine;
+
+  line = line.replace(/(`(?:\\.|[^`])*`|"(?:\\.|[^"])*"|'(?:\\.|[^'])*')/g, (match) =>
+    stash(match, 'string')
+  );
+
+  const keywords = languageKeywords[linguagem] ?? [];
+  if (keywords.length > 0) {
+    const keywordPattern = new RegExp(`\\b(${keywords.map(escapeRegExp).join('|')})\\b`, 'g');
+    line = line.replace(keywordPattern, (match) => stash(match, 'keyword'));
+  }
+
+  line = line.replace(/\b(\d+(?:\.\d+)?)\b/g, (match) => stash(match, 'number'));
+  line = line.replace(/([{}()[\].,;:])/g, (match) => stash(match, 'punctuation'));
+  line = escapeHtml(line);
+
+  if (comment) {
+    line += stash(comment, 'comment');
+  }
+
+  tokens.forEach((html, marker) => {
+    line = line.replaceAll(marker, html);
+  });
+
+  return line || '&nbsp;';
+}
+
+function getHighlightedCodeLines(codigo: string, linguagem: string) {
+  return codigo.replace(/\r\n/g, '\n').split('\n').map((line, index) => ({
+    number: index + 1,
+    html: highlightCodeLine(line, linguagem),
+  }));
+}
+
+const servicos = [
+  {
+    categoria: "ERPs",
+    sistemas: ["Bling", "Tiny", "Sankhya", "TOTVS"],
+    icon: "fa-chart-line",
+    cor: "#6C5CE7"
+  },
+  {
+    categoria: "E-commerces",
+    sistemas: ["Nuvemshop", "Loja Integrada", "WooCommerce", "Shopify"],
+    icon: "fa-shopping-cart",
+    cor: "#00B894"
+  },
+  {
+    categoria: "Pagamentos",
+    sistemas: ["Mercado Pago", "Stripe", "PagSeguro", "PayPal"],
+    icon: "fa-credit-card",
+    cor: "#FDCB6E"
+  },
+  {
+    categoria: "CRMs",
+    sistemas: ["RD Station", "Pipedrive", "HubSpot", "Salesforce"],
+    icon: "fa-users",
+    cor: "#E17055"
+  },
+  {
+    categoria: "Logística",
+    sistemas: ["Melhor Envio", "Correios", "Jadlog", "Total Express"],
+    icon: "fa-truck",
+    cor: "#0984E3"
+  },
+  {
+    categoria: "Marketplaces",
+    sistemas: ["Amazon", "Mercado Livre", "Magalu", "B2W"],
+    icon: "fa-store",
+    cor: "#A29BFE"
+  }
+];
+
+const diferenciais = [
+  {
+    titulo: "Tratamento de Erros e Logs",
+    descricao: "Sistema robusto de captura e registro de erros com alertas em tempo real",
+    icon: "fa-shield-alt"
+  },
+  {
+    titulo: "Segurança Avançada",
+    descricao: "OAuth2, API Keys, criptografia e conformidade com LGPD",
+    icon: "fa-lock"
+  },
+  {
+    titulo: "Monitoramento 24/7",
+    descricao: "Acompanhamento contínuo das integrações com dashboards em tempo real",
+    icon: "fa-chart-bar"
+  },
+  {
+    titulo: "Retry Automático",
+    descricao: "Tentativas inteligentes de reprocessamento em caso de falhas temporárias",
+    icon: "fa-sync-alt"
+  },
+  {
+    titulo: "Documentação Completa",
+    descricao: "Guias detalhados, exemplos de código e suporte técnico especializado",
+    icon: "fa-book"
+  },
+  {
+    titulo: "Escalabilidade",
+    descricao: "Infraestrutura preparada para crescer junto com seu negócio",
+    icon: "fa-rocket"
+  }
+];
+
+const exemplosLinguagens = [
+  {
+    titulo: "Nuvemshop → Bling",
+    linguagem: "TypeScript",
+    descricao: "Webhook Astro recebendo pedidos da loja e enviando venda validada ao ERP",
+    codigo: `// src/pages/api/webhooks/nuvemshop-pedido.ts
+import type { APIRoute } from 'astro';
+
+interface PedidoNuvemshop {
+  id: number;
+  number: string;
+  total: string;
+  customer: { name: string; email: string };
+  products: Array<{ sku: string; name: string; quantity: number; price: string }>;
+}
+
+const toVendaBling = (pedido: PedidoNuvemshop) => ({
+  numero: pedido.number,
+  cliente: {
+    nome: pedido.customer.name,
+    email: pedido.customer.email,
+  },
+  itens: pedido.products.map((produto) => ({
+    codigo: produto.sku,
+    descricao: produto.name,
+    quantidade: produto.quantity,
+    valor: Number(produto.price),
+  })),
+});
+
+export const POST: APIRoute = async ({ request }) => {
+  const assinatura = request.headers.get('x-linkedstore-hmac-sha256');
+  if (!assinatura) {
+    return new Response('Assinatura ausente', { status: 401 });
+  }
+
+  const pedido = (await request.json()) as PedidoNuvemshop;
+  const venda = toVendaBling(pedido);
+
+  try {
+    const response = await fetch('https://www.bling.com.br/Api/v3/pedidos/vendas', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer ' + import.meta.env.BLING_TOKEN,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(venda),
+    });
+
+    if (!response.ok) {
+      throw new Error('Bling retornou HTTP ' + response.status);
+    }
+
+    return Response.json({ ok: true, pedido: pedido.number });
+  } catch (error) {
+    console.error('Falha ao sincronizar pedido', { pedido: pedido.number, error });
+    return Response.json({ ok: false, retry: true }, { status: 502 });
+  }
+};`,
+  },
+  {
+    titulo: "Mercado Pago → CRM",
+    linguagem: "Python",
+    descricao: "FastAPI conciliando pagamento aprovado e atualizando funil comercial",
+    codigo: `# backend/conciliacao_pagamentos.py
+from fastapi import FastAPI, HTTPException, Header
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import httpx
+import os
+
+app = FastAPI(title="Conciliação Mercado Pago")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://fidestechapi.com.br"],
+    allow_methods=["*"],
+)
+
+class EventoPagamento(BaseModel):
+    payment_id: str
+    pedido_id: str
+    cliente_email: str
+
+MP_TOKEN = os.environ["MP_ACCESS_TOKEN"]
+CRM_TOKEN = os.environ["CRM_TOKEN"]
+
+@app.post("/webhooks/mercado-pago")
+async def conciliar_pagamento(
+    evento: EventoPagamento,
+    x_api_key: str = Header(...)
+):
+    if x_api_key != os.environ["WEBHOOK_SECRET"]:
+        raise HTTPException(status_code=401, detail="Não autorizado")
+
+    async with httpx.AsyncClient() as client:
+        pagamento = await client.get(
+            f"https://api.mercadopago.com/v1/payments/{evento.payment_id}",
+            headers={"Authorization": f"Bearer {MP_TOKEN}"},
+            timeout=10.0,
+        )
+        pagamento.raise_for_status()
+        dados = pagamento.json()
+
+        if dados["status"] != "approved":
+            return {"ok": True, "acao": "aguardar_confirmacao"}
+
+        negocio = await client.post(
+            "https://api.pipedrive.com/v1/deals",
+            params={"api_token": CRM_TOKEN},
+            json={
+                "title": f"Pedido {evento.pedido_id}",
+                "value": dados["transaction_amount"],
+                "status": "won",
+                "person_email": evento.cliente_email,
+            },
+            timeout=10.0,
+        )
+        negocio.raise_for_status()
+
+    return {"ok": True, "pedido": evento.pedido_id}`,
+  },
+  {
+    titulo: "WooCommerce → ERP",
+    linguagem: "PHP 8.2",
+    descricao: "Endpoint PHP recebendo atualização de estoque e publicando no ERP",
+    codigo: `<?php
+declare(strict_types=1);
+
+readonly class EstoqueErpClient
+{
+    public function __construct(
+        private string $baseUrl,
+        private string $apiKey,
+    ) {}
+
+    public function atualizar(string $sku, int $quantidade): array
+    {
+        $payload = [
+            'sku' => $sku,
+            'quantidade' => $quantidade,
+            'origem' => 'woocommerce',
+            'sincronizado_em' => date(DATE_ATOM),
+        ];
+
+        $ch = curl_init($this->baseUrl . '/v1/estoque');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => json_encode($payload),
+            CURLOPT_TIMEOUT        => 10,
+            CURLOPT_HTTPHEADER     => [
+                'Content-Type: application/json',
+                "Authorization: Bearer {$this->apiKey}",
+            ],
+        ]);
+
+        $response = curl_exec($ch);
+        $status   = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($response === false || $status >= 400) {
+            throw new \RuntimeException("ERP retornou erro HTTP {$status}");
+        }
+
+        return json_decode((string) $response, true, flags: JSON_THROW_ON_ERROR);
+    }
+}
+
+$payload = json_decode(file_get_contents('php://input'), true);
+$sku = trim((string) ($payload['sku'] ?? ''));
+$quantidade = (int) ($payload['stock_quantity'] ?? -1);
+
+if ($sku === '' || $quantidade < 0) {
+    http_response_code(422);
+    echo json_encode(['erro' => 'Payload inválido']);
+    exit;
+}
+
+$client = new EstoqueErpClient($_ENV['ERP_BASE_URL'], $_ENV['ERP_API_KEY']);
+
+try {
+    $resultado = $client->atualizar($sku, $quantidade);
+    http_response_code(200);
+    echo json_encode(['ok' => true, 'data' => $resultado]);
+} catch (\RuntimeException $e) {
+    http_response_code(502);
+    echo json_encode(['erro' => $e->getMessage()]);
+}`,
+  },
+  {
+    titulo: "Frete → Checkout",
+    linguagem: "Go",
+    descricao: "Microserviço Go calculando cotação de frete com timeout e fallback",
+    codigo: `package main
+
+import (
+    "encoding/json"
+    "fmt"
+    "net/http"
+    "os"
+    "time"
+)
+
+type Quote struct {
+    Carrier string  \`json:"carrier"\`
+    Service string  \`json:"service"\`
+    Price   float64 \`json:"price"\`
+    Days    int     \`json:"days"\`
+}
+
+var httpClient = &http.Client{Timeout: 4 * time.Second}
+
+func quoteShipping(w http.ResponseWriter, r *http.Request) {
+    cep := r.URL.Query().Get("cep")
+    sku := r.URL.Query().Get("sku")
+    if cep == "" || sku == "" {
+        http.Error(w, "cep e sku são obrigatórios", http.StatusBadRequest)
+        return
+    }
+
+    url := fmt.Sprintf(
+        "https://api.melhorenvio.com.br/v2/me/shipment/calculate?cep=%s&sku=%s",
+        cep, sku,
+    )
+
+    req, _ := http.NewRequest(http.MethodGet, url, nil)
+    req.Header.Set("Authorization", "Bearer "+os.Getenv("MELHOR_ENVIO_TOKEN"))
+
+    resp, err := httpClient.Do(req)
+    if err != nil {
+        json.NewEncoder(w).Encode([]Quote{{Carrier: "Retirada", Service: "Loja", Price: 0, Days: 1}})
+        return
+    }
+    defer resp.Body.Close()
+
+    if resp.StatusCode >= 400 {
+        http.Error(w, "transportadora indisponível", http.StatusBadGateway)
+        return
+    }
+
+    var quotes []Quote
+    json.NewDecoder(resp.Body).Decode(&quotes)
+
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(quotes)
+}
+
+func main() {
+    http.HandleFunc("/shipping/quote", quoteShipping)
+    http.ListenAndServe(":3001", nil)
+}`,
+  },
+  {
+    titulo: "WMS → Estoque",
+    linguagem: "Rust",
+    descricao: "Endpoint Rust consultando disponibilidade por SKU com cache de cliente HTTP",
+    codigo: `// src/main.rs — Axum server
+use axum::{extract::{Query, State}, http::StatusCode, routing::get, Json, Router};
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+
+#[derive(Clone)]
+struct AppState {
+    client: Client,
+    api_key: String,
+}
+
+#[derive(Deserialize)]
+struct Params { sku: String, loja: Option<String> }
+
+#[derive(Serialize, Deserialize)]
+struct Estoque {
+    sku: String,
+    loja: String,
+    quantidade: u32,
+    reservado: u32,
+    disponivel: bool,
+}
+
+async fn buscar_estoque(
+    Query(params): Query<Params>,
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<Estoque>, StatusCode> {
+    let loja = params.loja.unwrap_or_else(|| "matriz".to_string());
+    let url = format!("https://api.wms.com.br/v1/lojas/{}/estoque/{}", loja, params.sku);
+
+    let estoque = state.client
+        .get(url)
+        .bearer_auth(&state.api_key)
+        .send()
+        .await
+        .map_err(|_| StatusCode::BAD_GATEWAY)?
+        .json::<Estoque>()
+        .await
+        .map_err(|_| StatusCode::BAD_GATEWAY)?;
+
+    Ok(Json(estoque))
+}
+
+#[tokio::main]
+async fn main() {
+    let state = Arc::new(AppState {
+        client: Client::new(),
+        api_key: std::env::var("WMS_API_KEY").unwrap(),
+    });
+
+    let app = Router::new().route("/estoque", get(buscar_estoque)).with_state(state);
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3002").await.unwrap();
+    axum::serve(listener, app).await.unwrap();
+}`,
+  },
+  {
+    titulo: "SEFAZ → Financeiro",
+    linguagem: "Java 21",
+    descricao: "Spring WebFlux consultando NF-e e enviando status para o financeiro",
+    codigo: `// NfeController.java
+@RestController
+@RequestMapping("/api/nfe")
+public class NfeController {
+
+    private final WebClient sefaz;
+    private final WebClient financeiro;
+
+    @Value("\${sefaz.api.key}")
+    private String apiKey;
+
+    public NfeController(WebClient.Builder builder) {
+        this.sefaz = builder.baseUrl("https://api.sefaz.rs.gov.br").build();
+        this.financeiro = builder.baseUrl("https://financeiro.empresa.com.br").build();
+    }
+
+    @GetMapping("/{chave}")
+    public Mono<ResponseEntity<NfeDto>> consultarNfe(@PathVariable String chave) {
+        return sefaz.get()
+            .uri("/v1/nfe/{chave}", chave)
+            .header("X-Api-Key", apiKey)
+            .retrieve()
+            .bodyToMono(NfeDto.class)
+            .flatMap(nfe -> financeiro.post()
+                .uri("/api/documentos-fiscais")
+                .bodyValue(new DocumentoFiscalDto(chave, nfe.status(), nfe.valorTotal()))
+                .retrieve()
+                .toBodilessEntity()
+                .thenReturn(ResponseEntity.ok(nfe)))
+            .onErrorReturn(ResponseEntity.status(502).build());
+    }
+}`,
+  },
+];
+const planos = [
+  {
+    nome: "Projeto Pontual",
+    preco: "A partir de R$ 2.500",
+    descricao: "Ideal para integrações específicas e projetos únicos",
+    recursos: [
+      "Análise de requisitos",
+      "Desenvolvimento customizado",
+      "Testes e homologação",
+      "Documentação técnica",
+      "30 dias de suporte"
+    ],
+    destaque: false
+  },
+  {
+    nome: "Assinatura Mensal",
+    preco: "R$ 790/mês",
+    descricao: "Manutenção contínua e novas integrações",
+    recursos: [
+      "Até 3 integrações ativas",
+      "Monitoramento 24/7",
+      "Atualizações de APIs",
+      "Suporte prioritário",
+      "Relatórios mensais",
+      "Backup e redundância"
+    ],
+    destaque: true
+  },
+  {
+    nome: "Suporte por Hora",
+    preco: "R$ 150/hora",
+    descricao: "Flexibilidade para demandas pontuais",
+    recursos: [
+      "Consultoria técnica",
+      "Correção de bugs",
+      "Ajustes e melhorias",
+      "Análise de logs",
+      "Sem fidelidade"
+    ],
+    destaque: false
+  }
+];
+
+const faqs = [
+  {
+    pergunta: "Quanto tempo leva para implementar uma integração?",
+    resposta: "O prazo varia de acordo com a complexidade. Integrações simples podem ser concluídas em 3-5 dias úteis, enquanto projetos mais complexos podem levar de 2 a 4 semanas. Fazemos uma análise inicial gratuita para estimar o prazo específico do seu projeto."
+  },
+  {
+    pergunta: "Vocês trabalham com APIs proprietárias ou sistemas internos?",
+    resposta: "Sim! Além das integrações com plataformas conhecidas, desenvolvemos conectores para APIs proprietárias, sistemas legados e bancos de dados internos. Nossa equipe tem experiência com REST, SOAP, GraphQL e diversos protocolos de comunicação."
+  },
+  {
+    pergunta: "Como é garantida a segurança dos dados?",
+    resposta: "Utilizamos as melhores práticas de segurança: criptografia TLS/SSL, autenticação OAuth2, armazenamento seguro de credenciais, logs auditáveis e conformidade com a LGPD. Todos os dados trafegam por canais seguros e nunca são compartilhados com terceiros."
+  },
+  {
+    pergunta: "Qual o suporte oferecido após a entrega?",
+    resposta: "Todos os projetos incluem período de garantia (mínimo 30 dias). Oferecemos suporte via e-mail, WhatsApp e videochamada. Para clientes com assinatura mensal, o suporte é prioritário com SLA de resposta em até 4 horas úteis."
+  },
+  {
+    pergunta: "Qual é a disponibilidade e uptime das integrações?",
+    resposta: "Garantimos 99.5% de uptime nas integrações em produção. Nossa infraestrutura é redundante com servidores em múltiplas regiões para alta disponibilidade. Monitoramos continuamente cada integração e alertamos automaticamente em caso de falhas."
+  },
+  {
+    pergunta: "Como funciona o reprocessamento automático (retry) de erros?",
+    resposta: "O sistema tenta reenviar automaticamente a requisição em caso de falha temporária. A frequência de tentativas segue uma estratégia exponencial: 1ª tentativa em 1 minuto, 2ª em 5 minutos, 3ª em 15 minutos. Você pode configurar o número máximo de tentativas e receber alertas."
+  },
+  {
+    pergunta: "Como é realizado o onboarding e qual o tempo de ativação?",
+    resposta: "O processo de onboarding leva em média 2-5 dias: 1º dia - análise de requisitos; 2º-3º dias - desenvolvimento e testes; 4º-5º dias - homologação e deploy em produção. Você acompanha cada etapa através de um dashboard exclusivo com relatórios em tempo real."
+  },
+  {
+    pergunta: "Qual é a taxa de sucesso e confiabilidade das integrações?",
+    resposta: "Nossas integrações possuem taxa média de sucesso de 99.2% em processamento de mensagens. Cada falha é registrada, analisada e comunicada para tratamento. Mantemos logs detalhados por até 90 dias para auditoria e troubleshooting."
+  },
+  {
+    pergunta: "Posso pausar ou cancelar minha assinatura a qualquer momento?",
+    resposta: "Sim! Na assinatura mensal você pode cancelar com 5 dias de antecedência, sem multa ou penalidade. Se necessário pausar temporariamente, podemos oferecer um plano reduced-cost. Projetos pontuais não têm cláusula de cancelamento após aceita a proposta."
+  },
+  {
+    pergunta: "Como vocês tratam atualizações e mudanças nas APIs externas?",
+    resposta: "Monitoramos constantemente mudanças nas APIs de terceiros. Quando há atualizações, nossa equipe realiza testes e adapt o código automaticamente. Notificamos você com antecedência sobre mudanças críticas. Atualizações são incluídas na manutenção para clientes com assinatura mensal."
+  },
+  {
+    pergunta: "Existe possibilidade de teste antes de contratar?",
+    resposta: "Sim! Oferecemos uma demonstração técnica gratuita onde avaliamos seu cenário e mostramos como nossa solução funciona. Clientes podem solicitar um pilot de 15 dias em ambiente de sandbox para validar a solução antes do investimento em produção."
+  }
+];
 ---
 
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="FidesTech API - Integração de APIs entre ERPs, E-commerces, Pagamentos, CRMs e mais. Automação segura e eficiente para seu negócio." />
+  <title>FidesTech API - Integração de APIs e Sistemas</title>
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="icon" href="/favicon.ico" />
+  
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&family=Share+Tech+Mono&family=Saira+Stencil+One&display=swap" rel="stylesheet" />
+  
+</head>
+<body>
+  
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="container">
+      <div class="nav-content">
+        <div class="logo">
+          <span class="logo-text">
+            <span class="logo-fides">FidesTech</span>
+            <span class="logo-api">API</span>
+          </span>
+        </div>
+        <ul class="nav-links">
+          <li><a href="#servicos">Serviços</a></li>
+          <li><a href="#diferenciais">Diferenciais</a></li>
+          <li><a href="#exemplos">Exemplos</a></li>
+          <li><a href="#planos">Planos</a></li>
+          <li><a href="#faq">FAQ</a></li>
+        </ul>
+        <button class="btn-primary" id="btnContatoNav">Solicitar Orçamento</button>
+        <button class="mobile-menu-btn" id="mobileMenuBtn">
+          <i class="fas fa-bars"></i>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="hero-background"></div>
+    <div class="container">
+      <div class="hero-content reveal">
+        <h1 class="hero-title">
+          Integre seus sistemas com <span class="gradient-text">segurança e agilidade</span>
+        </h1>
+        <p class="hero-subtitle">
+          Conectamos ERPs, e-commerces, gateways de pagamento, CRMs, logística e marketplaces. 
+          Automatize processos, reduza erros e escale seu negócio com nossas soluções de integração.
+        </p>
+        <div class="hero-cta">
+          <button class="btn-hero" id="btnHero">
+            <i class="fas fa-rocket"></i>
+            Solicitar Orçamento
+          </button>
+          <a href="#exemplos" class="btn-secondary">
+            <i class="fas fa-code"></i>
+            Ver Exemplos
+          </a>
+        </div>
+        <div class="hero-badges">
+          <div class="badge">
+            <i class="fas fa-shield-alt"></i>
+            <span>Conformidade LGPD</span>
+          </div>
+          <div class="badge">
+            <i class="fas fa-clock"></i>
+            <span>Suporte 24/7</span>
+          </div>
+          <div class="badge">
+            <i class="fas fa-check-circle"></i>
+            <span>+150 Integrações</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Serviços Section -->
+  <section id="servicos" class="section servicos">
+    <div class="container">
+      <div class="section-header reveal">
+        <h2 class="section-title">Sistemas que Integramos</h2>
+        <p class="section-subtitle">Conectamos as principais plataformas do mercado brasileiro</p>
+      </div>
+      <div class="servicos-grid">
+        {servicos.map((servico, index) => (
+          <div class="servico-card reveal" style={`animation-delay: ${index * 0.1}s`}>
+            <div class="servico-icon" style={`background: ${servico.cor}15; color: ${servico.cor}`}>
+              <i class={`fas ${servico.icon}`}></i>
+            </div>
+            <h3>{servico.categoria}</h3>
+            <ul class="sistemas-list">
+              {servico.sistemas.map(sistema => (
+                <li><i class="fas fa-check"></i> {sistema}</li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Diferenciais Section -->
+  <section id="diferenciais" class="section diferenciais">
+    <div class="container">
+      <div class="section-header reveal">
+        <h2 class="section-title section-title--brand-split">
+          <span class="section-title-plain">Por que escolher a </span>
+          <span class="logo-text section-title-logo-text">
+            <span class="logo-fides">FidesTech</span><span class="logo-api">API</span>
+          </span>
+          <span class="section-title-plain">?</span>
+        </h2>
+        <p class="section-subtitle">Tecnologia de ponta e expertise para garantir o sucesso das suas integrações</p>
+      </div>
+      <div class="diferenciais-grid">
+        {diferenciais.map((diferencial, index) => (
+          <div class="diferencial-card reveal" style={`animation-delay: ${index * 0.1}s`}>
+            <div class="diferencial-icon">
+              <i class={`fas ${diferencial.icon}`}></i>
+            </div>
+            <h3>{diferencial.titulo}</h3>
+            <p>{diferencial.descricao}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Exemplos de Código Section -->
+  <section id="exemplos" class="section exemplos">
+    <div class="container">
+      <div class="section-header reveal">
+        <h2 class="section-title">Exemplos Práticos de Integração</h2>
+        <p class="section-subtitle">Veja como implementamos soluções reais para nossos clientes</p>
+      </div>
+      
+      <div class="exemplos-container reveal">
+        <div class="ex-tabs" role="tablist">
+          {exemplosLinguagens.map((exemplo, index) => (
+            <button
+              id={`exTab${index}-tab`}
+              class={`ex-tab ${index === 0 ? 'active' : ''}`}
+              data-tab={`exTab${index}`}
+              role="tab"
+              aria-controls={`exTab${index}`}
+              aria-selected={index === 0 ? 'true' : 'false'}
+            >
+              <span class="ex-tab-icon">&lt;/&gt;</span>
+              <span class="ex-tab-name">{exemplo.titulo}</span>
+              <span class="ex-tab-lang">{exemplo.linguagem}</span>
+            </button>
+          ))}
+        </div>
+
+        <div class="ex-panels">
+          {exemplosLinguagens.map((exemplo, index) => (
+            <div
+              class={`ex-panel ${index === 0 ? 'active' : ''}`}
+              id={`exTab${index}`}
+              role="tabpanel"
+              aria-labelledby={`exTab${index}-tab`}
+            >
+              <div class="ex-panel-header">
+                <div>
+                  <div class="ex-panel-title">{exemplo.titulo}</div>
+                  <div class="ex-panel-desc">{exemplo.descricao}</div>
+                </div>
+              </div>
+
+              <div class="code-window">
+                <div class="code-header">
+                  <div class="code-dots">
+                    <div class="code-dot red"></div>
+                    <div class="code-dot yellow"></div>
+                    <div class="code-dot green"></div>
+                  </div>
+                  <span class="code-title">{exemplo.linguagem}</span>
+                </div>
+                <div class="code-editor" aria-label={`Código: ${exemplo.titulo}`}>
+                  <div class="code-editor-scroll">
+                    {getHighlightedCodeLines(exemplo.codigo, exemplo.linguagem).map((line) => (
+                      <div class="code-line">
+                        <span class="code-line-number">{line.number}</span>
+                        <code class="code-line-code" set:html={line.html}></code>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Planos Section -->
+  <section id="planos" class="section planos">
+    <div class="container">
+      <div class="section-header reveal">
+        <h2 class="section-title">Planos e Modalidades</h2>
+        <p class="section-subtitle">Escolha a melhor opção para o seu negócio</p>
+      </div>
+      <div class="planos-grid">
+        {planos.map((plano, index) => (
+          <div class={`plano-card reveal ${plano.destaque ? 'destaque' : ''}`} style={`animation-delay: ${index * 0.1}s`}>
+            {plano.destaque && <div class="plano-badge">Mais Popular</div>}
+            <h3>{plano.nome}</h3>
+            <div class="plano-preco">{plano.preco}</div>
+            <p class="plano-descricao">{plano.descricao}</p>
+            <ul class="plano-recursos">
+              {plano.recursos.map(recurso => (
+                <li><i class="fas fa-check-circle"></i> {recurso}</li>
+              ))}
+            </ul>
+            <button class="btn-plano">Escolher Plano</button>
+          </div>
+        ))}
+      </div>
+      <div class="planos-footer reveal">
+        <p><i class="fas fa-info-circle"></i> Atendemos empresas de todos os portes no Brasil. Entre em contato para um orçamento personalizado.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ Section -->
+  <section class="faq">
+    <div class="container">
+      <h2 class="section-title" style="text-align: center; margin-bottom: 40px;">Perguntas Frequentes</h2>
+      
+      <button id="toggleFaq" class="faq-toggle-btn">
+        Mostrar FAQ
+      </button>
+
+      <div id="faqWrapper" class="faq-wrapper">
+        <div class="faq-container">
+          {faqs.map((faq) => (
+            <div class="faq-item">
+              <button class="faq-question">
+                <span>{faq.pergunta}</span>
+                <i class="fas fa-plus"></i>
+              </button>
+              <div class="faq-answer">
+                <p>{faq.resposta}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    setTimeout(() => {
+      const toggleBtn = document.getElementById('toggleFaq');
+      const faqWrapper = document.getElementById('faqWrapper');
+      const questions = document.querySelectorAll('.faq-question');
+      
+      console.log('FAQ Script started - Found questions:', questions.length);
+      
+      if (toggleBtn && faqWrapper) {
+        toggleBtn.addEventListener('click', () => {
+          faqWrapper.classList.toggle('show');
+          toggleBtn.textContent = faqWrapper.classList.contains('show') ? 'Ocultar FAQ' : 'Mostrar FAQ';
+        });
+      }
+      
+      questions.forEach((question, index) => {
+        question.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          
+          let item = question.parentElement;
+          console.log('Question clicked:', index);
+          console.log('Parent element:', item);
+          console.log('Parent classes before:', item.className);
+          
+          if (!item) return;
+          
+          const allItems = document.querySelectorAll('.faq-item');
+          
+          // Remove active de todos
+          allItems.forEach((el) => {
+            el.classList.remove('active');
+          });
+          
+          // Sempre adiciona (nunca toggle)
+          item.classList.add('active');
+          
+          console.log('Parent classes after:', item.className);
+          console.log('Has active class now:', item.classList.contains('active'));
+          console.log('Item HTML:', item.outerHTML.substring(0, 200));
+        });
+      });
+    }, 100);
+  </script>
+
+  <!-- Contato Section -->
+  <section id="contato" class="section contato">
+    <div class="container">
+      <div class="contato-content">
+        <div class="contato-info reveal">
+          <h2>Pronto para integrar seus sistemas?</h2>
+          <p>Entre em contato conosco e receba um orçamento personalizado em até 24 horas.</p>
+          <div class="contato-detalhes">
+            <div class="contato-item">
+              <i class="fas fa-envelope"></i>
+              <div>
+                <strong>E-mail</strong>
+                <p>contato@fidestech.api</p>
+              </div>
+            </div>
+            <div class="contato-item">
+              <i class="fas fa-phone"></i>
+              <div>
+                <strong>Telefone</strong>
+                <p>(32) 99951-3968</p>
+              </div>
+            </div>
+            <div class="contato-item">
+              <i class="fas fa-map-marker-alt"></i>
+              <div>
+                <strong>Localização</strong>
+                <p>Visconde do Rio Branco, MG - Brasil</p>
+              </div>
+            </div>
+          </div>
+          <div class="social-links">
+            <a href="#" aria-label="LinkedIn"><i class="fab fa-linkedin"></i></a>
+            <a href="#" aria-label="GitHub"><i class="fab fa-github"></i></a>
+            <a href="#" aria-label="WhatsApp"><i class="fab fa-whatsapp"></i></a>
+            <a href="#" aria-label="Twitter"><i class="fab fa-twitter"></i></a>
+          </div>
+        </div>
+        
+        <div class="contato-form reveal">
+          <form id="formContato">
+            <div class="form-group">
+              <label for="nome">Nome Completo</label>
+              <input type="text" id="nome" name="nome" required />
+            </div>
+            <div class="form-group">
+              <label for="email">E-mail</label>
+              <input type="email" id="email" name="email" required />
+            </div>
+            <div class="form-group">
+              <label for="telefone">Telefone</label>
+              <input type="tel" id="telefone" name="telefone" />
+            </div>
+            <div class="form-group">
+              <label for="mensagem">Mensagem</label>
+              <textarea id="mensagem" name="mensagem" rows="5" required></textarea>
+            </div>
+            <button type="submit" class="btn-submit">
+              <i class="fas fa-paper-plane"></i>
+              Enviar Mensagem
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-logo">
+          <span class="logo-text">
+            <span class="logo-fides">FidesTech</span>
+            <span class="logo-api">API</span>
+          </span>
+        </div>
+        <p class="footer-text">
+          Soluções de integração de APIs para empresas que buscam automação, segurança e escalabilidade.
+        </p>
+        <p class="footer-copy">
+          &copy; <span id="anoAtual"></span> <span class="logo-text" style="display: inline-flex; gap: 4px; align-items: center;"><span class="logo-fides" style="background: linear-gradient(135deg, #E63946 0%, #DC143C 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-family: 'Share Tech Mono', monospace; font-weight: 400; letter-spacing: 1px;">FidesTech</span><span class="logo-api" style="background: linear-gradient(135deg, #C0C0C0 0%, #E8E8E8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-family: 'Saira Stencil One', cursive; font-weight: 400; letter-spacing: 2px; font-size: 1.3em;">API</span></span>. Todos os direitos reservados.
+        </p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Botão Scroll to Top -->
+  <button class="scroll-top" id="scrollTop">
+    <i class="fas fa-arrow-up"></i>
+  </button>
+
+
+<style>
+  /* Reset e Variáveis */
+  :root {
+    --primary: #000000;
+    --gold: #D4AF37;
+    --gold-dark: #B8941F;
+    --red: #DC143C;
+    --red-dark: #B8001F;
+    --dark: #000000;
+    --gray: #4a4a4a;
+    --light-gray: #e0e0e0;
+    --bg: #FFFFFF;
+    --bg-alt: #fafafa;
+    --shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.15);
+    --radius: 16px;
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  *, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: var(--dark);
+    background: var(--bg);
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* Navbar */
+  .navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: #000000;
+    box-shadow: 0 2px 20px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    transition: var(--transition);
+  }
+
+  .nav-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 0;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  .logo-img {
+    width: 40px;
+    height: 40px;
+    display: block;
+  }
+
+  .logo-text {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    animation: slideInFromLeft 1s ease-out;
+  }
+
+  .logo-fides {
+    background: linear-gradient(135deg, #E63946 0%, #DC143C 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-family: 'Share Tech Mono', monospace;
+    font-weight: 400;
+    letter-spacing: 1px;
+  }
+
+  .logo-api {
+    background: linear-gradient(135deg, #C0C0C0 0%, #E8E8E8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-family: 'Saira Stencil One', cursive;
+    font-weight: 400;
+    letter-spacing: 2px;
+    font-size: 1.3em;
+  }
+
+  @keyframes slideInFromLeft {
+    0% {
+      opacity: 0;
+      transform: translateX(-100px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .nav-links {
+    display: flex;
+    list-style: none;
+    gap: 24px;
+  }
+
+  .nav-links a {
+    text-decoration: none;
+    color: #FFFFFF;
+    font-weight: 500;
+    font-size: 14px;
+    transition: var(--transition);
+    position: relative;
+  }
+
+  .nav-links a::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background: #FFFFFF;
+    transition: var(--transition);
+  }
+
+  .nav-links a:hover {
+    color: #cccccc;
+  }
+
+  .nav-links a:hover::after {
+    width: 100%;
+  }
+
+  .mobile-menu-btn {
+    display: none;
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: #FFFFFF;
+    cursor: pointer;
+  }
+
+  /* Buttons */
+  .btn-primary, .btn-hero, .btn-secondary, .btn-plano, .btn-submit {
+    padding: 10px 24px;
+    border-radius: 50px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: var(--transition);
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+  }
+
+  .btn-primary {
+    background: var(--gold);
+    color: #000000;
+    border: 2px solid var(--gold);
+  }
+
+  .btn-primary:hover {
+    background: var(--gold-dark);
+    border-color: var(--gold-dark);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(212, 175, 55, 0.4);
+  }
+
+  .btn-hero {
+    background: var(--red);
+    color: #FFFFFF;
+    font-size: 16px;
+    padding: 14px 32px;
+    border: 2px solid var(--red);
+  }
+
+  .btn-hero:hover {
+    background: var(--red-dark);
+    border-color: var(--red-dark);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(220, 20, 60, 0.4);
+  }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--gold);
+    border: 2px solid var(--gold);
+    text-decoration: none;
+    padding: 12px 30px;
+  }
+
+  .btn-secondary:hover {
+    background: var(--gold);
+    color: #000000;
+  }
+
+  /* Hero Section */
+  .hero {
+    position: relative;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    padding-top: 100px;
+    overflow: hidden;
+  }
+
+  .hero-background {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, #f5f5f5 0%, #ffffff 100%);
+    z-index: -1;
+  }
+
+  .hero-background::before {
+    content: '';
+    position: absolute;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, #000000 0%, transparent 70%);
+    opacity: 0.03;
+    top: -200px;
+    right: -200px;
+    border-radius: 50%;
+    pointer-events: none;
+  }
+
+  .hero-content {
+    text-align: center;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .hero-title {
+    font-size: 48px;
+    font-weight: 800;
+    line-height: 1.2;
+    margin-bottom: 20px;
+    color: var(--dark);
+  }
+
+  .gradient-text {
+    background: linear-gradient(135deg, var(--gold) 0%, var(--red) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: 900;
+  }
+
+  .hero-subtitle {
+    font-size: 18px;
+    color: var(--gray);
+    margin-bottom: 32px;
+    line-height: 1.7;
+    max-width: 700px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .hero-cta {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    margin-bottom: 48px;
+  }
+
+  .hero-badges {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: white;
+    border-radius: 50px;
+    box-shadow: var(--shadow);
+    font-weight: 500;
+    font-size: 14px;
+  }
+
+  .badge i {
+    color: var(--red);
+    font-size: 18px;
+  }
+
+  /* Section */
+  .section {
+    padding: 80px 0;
+  }
+
+  .section-header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+
+  .section-title {
+    font-size: 36px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    background: linear-gradient(135deg, var(--gold) 0%, var(--red) 50%, #000000 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .section-title.section-title--brand-split {
+    background: none;
+    -webkit-background-clip: unset;
+    background-clip: unset;
+    -webkit-text-fill-color: unset;
+    color: #000000;
+  }
+
+  .section-title--brand-split .section-title-plain {
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+
+  .section-title--brand-split .section-title-logo-text {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+    animation: none;
+    isolation: isolate;
+  }
+
+  .section-subtitle {
+    font-size: 16px;
+    color: var(--gray);
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  /* Serviços */
+  .servicos {
+    background: var(--bg-alt);
+  }
+
+  .servicos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+  }
+
+  .servico-card {
+    background: white;
+    padding: 32px;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    transition: var(--transition);
+  }
+
+  .servico-card:hover {
+    transform: translateY(-6px);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .servico-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    margin-bottom: 20px;
+  }
+
+  .servico-card h3 {
+    font-size: 20px;
+    margin-bottom: 16px;
+    color: var(--dark);
+  }
+
+  .sistemas-list {
+    list-style: none;
+  }
+
+  .sistemas-list li {
+    padding: 6px 0;
+    color: var(--gray);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+  }
+
+  .sistemas-list i {
+    color: var(--gold);
+    font-size: 12px;
+  }
+
+  /* Diferenciais */
+  .diferenciais-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 24px;
+    max-width: 1000px;
+    margin: 0 auto;
+  }
+
+  .diferencial-card {
+    text-align: center;
+    padding: 32px 20px;
+    background: white;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    transition: var(--transition);
+    flex: 0 1 calc(33.333% - 16px);
+    min-width: 260px;
+  }
+
+  .diferencial-card:hover {
+    transform: translateY(-6px);
+    box-shadow: var(--shadow-lg);
+    border: 2px solid var(--gold);
+  }
+
+  .diferencial-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 20px;
+    background: linear-gradient(135deg, var(--gold) 0%, var(--red) 100%);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #FFFFFF;
+    font-size: 26px;
+  }
+
+  .diferencial-card h3 {
+    font-size: 18px;
+    margin-bottom: 10px;
+    color: var(--dark);
+  }
+
+  .diferencial-card p {
+    color: var(--gray);
+    line-height: 1.6;
+    font-size: 14px;
+  }
+
+  /* Exemplos */
+  .exemplos {
+    background: var(--bg-alt);
+  }
+
+  .exemplos-container {
+    background: white;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .ex-tabs {
+    display: flex;
+    border-bottom: 2px solid var(--light-gray);
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--red) var(--light-gray);
+    flex-wrap: wrap;
+  }
+
+  .ex-tabs::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  .ex-tabs::-webkit-scrollbar-track {
+    background: var(--light-gray);
+  }
+
+  .ex-tabs::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, var(--gold) 0%, var(--red) 100%);
+    border-radius: 3px;
+  }
+
+  .ex-tab {
+    flex: 1 1 auto;
+    min-width: 160px;
+    max-width: 200px;
+    padding: 14px 18px;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--gray);
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .ex-tab:hover {
+    background: rgba(212, 175, 55, 0.05);
+    color: var(--dark);
+  }
+
+  .ex-tab.active {
+    color: var(--red);
+    border-bottom-color: var(--red);
+    background: linear-gradient(to bottom, rgba(212, 175, 55, 0.05), rgba(220, 20, 60, 0.05));
+  }
+
+  .ex-tab-icon {
+    font-size: 11px;
+    color: inherit;
+    font-family: 'Share Tech Mono', monospace;
+    opacity: 0.6;
+  }
+
+  .ex-tab.active .ex-tab-icon {
+    color: var(--red);
+    opacity: 1;
+  }
+
+  .ex-tab-name {
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .ex-tab-lang {
+    font-size: 10px;
+    font-weight: 400;
+    color: var(--gray);
+  }
+
+  .ex-tab.active .ex-tab-lang {
+    color: var(--red);
+  }
+
+  .ex-panels {
+    background: #1e1e1e;
+  }
+
+  .ex-panel {
+    display: none;
+  }
+
+  .ex-panel.active {
+    display: block;
+    animation: fadeIn 0.35s ease;
+  }
+
+  .ex-panel-header {
+    background: #21222c;
+    padding: 20px 32px;
+    border-bottom: 1px solid #44475a;
+  }
+
+  .ex-panel-title {
+    font-size: 20px;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--gold) 0%, var(--red) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 6px;
+  }
+
+  .ex-panel-desc {
+    color: #8b95a3;
+    font-size: 13px;
+    margin-bottom: 12px;
+  }
+
+  .ex-dots {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .ex-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .ex-dot-r {
+    background: #ff5f57;
+  }
+
+  .ex-dot-y {
+    background: #febc2e;
+  }
+
+  .ex-dot-g {
+    background: #28c840;
+  }
+
+  /* Console estilo macOS + editor read-only */
+  .code-window {
+    background: #1e1e1e;
+    border-radius: 12px;
+    overflow: hidden;
+    margin: 22px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow:
+      0 24px 70px rgba(0, 0, 0, 0.36),
+      0 1px 0 rgba(255, 255, 255, 0.08) inset;
+  }
+
+  .code-header {
+    background: linear-gradient(180deg, #34343a 0%, #25252b 100%);
+    padding: 12px 18px;
+    display: grid;
+    grid-template-columns: 92px 1fr 92px;
+    align-items: center;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.65);
+  }
+
+  .code-dots {
+    display: flex;
+    gap: 8px;
+  }
+
+  .code-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    box-shadow:
+      0 0 0 1px rgba(0, 0, 0, 0.32) inset,
+      0 1px 2px rgba(0, 0, 0, 0.28);
+  }
+
+  .code-dot.red {
+    background: #ff5f56;
+  }
+
+  .code-dot.yellow {
+    background: #ffbd2e;
+  }
+
+  .code-dot.green {
+    background: #27c93f;
+  }
+
+  .code-title {
+    justify-self: center;
+    min-width: 0;
+    max-width: 100%;
+    color: #d7d7dd;
+    font-family: 'Poppins', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    padding: 7px 14px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.07);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset;
+  }
+
+  .code-editor {
+    height: min(560px, 62vh);
+    min-height: 320px;
+    width: 100%;
+    background: #1e1e1e;
+    overflow: hidden;
+    color: #d4d4d4;
+    font-family: 'Share Tech Mono', 'Consolas', 'Monaco', monospace;
+    font-size: 13.5px;
+    line-height: 22px;
+  }
+
+  .code-editor-scroll {
+    height: 100%;
+    overflow: auto;
+    padding: 14px 0;
+  }
+
+  .code-line {
+    display: grid;
+    grid-template-columns: 52px minmax(max-content, 1fr);
+    min-height: 22px;
+  }
+
+  .code-line-number {
+    color: #6b7280;
+    text-align: right;
+    padding: 0 14px 0 10px;
+    user-select: none;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    background: #1e1e1e;
+    position: sticky;
+    left: 0;
+  }
+
+  .code-line-code {
+    display: block;
+    padding-left: 16px;
+    padding-right: 24px;
+    white-space: pre;
+  }
+
+  .syntax-keyword {
+    color: #c586c0;
+  }
+
+  .syntax-string {
+    color: #ce9178;
+  }
+
+  .syntax-comment {
+    color: #6a9955;
+    font-style: italic;
+  }
+
+  .syntax-number {
+    color: #b5cea8;
+  }
+
+  .syntax-punctuation {
+    color: #d4d4d4;
+  }
+
+  /* Planos */
+  .planos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+    margin-bottom: 32px;
+  }
+
+  .plano-card {
+    background: white;
+    border-radius: var(--radius);
+    padding: 32px;
+    box-shadow: var(--shadow);
+    transition: var(--transition);
+    position: relative;
+    border: 2px solid transparent;
+  }
+
+  .plano-card:hover {
+    transform: translateY(-6px);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .plano-card.destaque {
+    border-color: var(--gold);
+    box-shadow: 0 16px 48px rgba(212, 175, 55, 0.3);
+  }
+
+  .plano-badge {
+    position: absolute;
+    top: -10px;
+    right: 20px;
+    background: linear-gradient(135deg, var(--gold) 0%, var(--red) 100%);
+    color: #FFFFFF;
+    padding: 5px 14px;
+    border-radius: 50px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .plano-card h3 {
+    font-size: 24px;
+    margin-bottom: 12px;
+    color: var(--dark);
+  }
+
+  .plano-preco {
+    font-size: 28px;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--gold) 0%, var(--red) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 12px;
+  }
+
+  .plano-descricao {
+    color: var(--gray);
+    margin-bottom: 24px;
+    min-height: 42px;
+    font-size: 14px;
+  }
+
+  .plano-recursos {
+    list-style: none;
+    margin-bottom: 24px;
+  }
+
+  .plano-recursos li {
+    padding: 10px 0;
+    color: var(--dark);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+  }
+
+  .plano-recursos i {
+    color: var(--gold);
+    font-size: 16px;
+  }
+
+  .btn-plano {
+    width: 100%;
+    background: linear-gradient(135deg, var(--gold) 0%, var(--red) 100%);
+    color: #FFFFFF;
+    justify-content: center;
+    border: none;
+  }
+
+  .btn-plano:hover {
+    background: linear-gradient(135deg, var(--gold-dark) 0%, var(--red-dark) 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(212, 175, 55, 0.4);
+  }
+
+  .planos-footer {
+    text-align: center;
+    padding: 24px;
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: var(--radius);
+  }
+
+  .planos-footer p {
+    color: var(--gray);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    font-size: 14px;
+  }
+
+  .planos-footer i {
+    color: var(--red);
+    font-size: 18px;
+  }
+
+  /* FAQ */
+  .faq {
+    background: var(--bg-alt);
+    padding: 80px 20px;
+    text-align: center;
+  }
+
+  .faq-wrapper {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition:
+      max-height 0.5s ease,
+      opacity 0.4s ease;
+  }
+
+  .faq-wrapper.show {
+    max-height: 5000px;
+    opacity: 1;
+  }
+
+  .faq-toggle-btn {
+    background: var(--gold);
+    color: white;
+    border: none;
+    padding: 14px 28px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-weight: 700;
+    margin-bottom: 30px;
+    transition: 0.3s;
+  }
+
+  .faq-toggle-btn:hover {
+    transform: translateY(-2px);
+  }
+
+  .faq-container {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  .faq-item {
+    background: white;
+    border-radius: var(--radius);
+    margin-bottom: 16px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .faq-question {
+    width: 100%;
+    padding: 20px;
+    background: none;
+    border: none;
+    text-align: left;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--dark);
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .faq-question i {
+    color: var(--gold);
+    font-size: 16px;
+    transition: transform 0.3s ease;
+  }
+
+  .faq-item.active .faq-question i {
+    transform: rotate(180deg);
+  }
+
+  .faq-answer {
+    display: none;
+    padding: 0;
+  }
+
+  .faq-item.active .faq-answer {
+    display: block;
+    padding: 20px;
+    background: #f9f9f9;
+  }
+
+  .faq-answer p {
+    color: var(--gray);
+    line-height: 1.7;
+    font-size: 14px;
+    margin: 0;
+  }
+
+  /* Contato */
+  .contato {
+    background: #000000;
+    color: white;
+  }
+
+  .contato-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 48px;
+    align-items: start;
+  }
+
+  .contato-info h2 {
+    font-size: 32px;
+    margin-bottom: 12px;
+  }
+
+  .contato-info > p {
+    font-size: 16px;
+    margin-bottom: 32px;
+    opacity: 0.9;
+  }
+
+  .contato-detalhes {
+    margin-bottom: 32px;
+  }
+
+  .contato-item {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .contato-item i {
+    font-size: 20px;
+    width: 44px;
+    height: 44px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .contato-item strong {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 14px;
+  }
+
+  .contato-item p {
+    opacity: 0.9;
+    font-size: 14px;
+  }
+
+  .social-links {
+    display: flex;
+    gap: 12px;
+  }
+
+  .social-links a {
+    width: 44px;
+    height: 44px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 18px;
+    transition: var(--transition);
+  }
+
+  .social-links a:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-3px);
+  }
+
+  .contato-form {
+    background: white;
+    padding: 32px;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .form-group {
+    margin-bottom: 20px;
+  }
+
+  .form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+    color: var(--dark);
+    font-size: 14px;
+  }
+
+  .form-group input,
+  .form-group textarea {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid var(--light-gray);
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 14px;
+    transition: var(--transition);
+  }
+
+  .form-group input:focus,
+  .form-group textarea:focus {
+    outline: none;
+    border-color: var(--gold);
+  }
+
+  .form-group textarea {
+    resize: vertical;
+  }
+
+  .btn-submit {
+    width: 100%;
+    background: linear-gradient(135deg, var(--gold) 0%, var(--red) 100%);
+    color: #FFFFFF;
+    justify-content: center;
+    border: none;
+  }
+
+  .btn-submit:hover {
+    background: linear-gradient(135deg, var(--gold-dark) 0%, var(--red-dark) 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(212, 175, 55, 0.4);
+  }
+
+  /* Footer */
+  .footer {
+    background: #000000;
+    color: white;
+    padding: 48px 0;
+    text-align: center;
+  }
+
+  .footer-logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 12px;
+  }
+
+  .footer-logo .logo-img {
+    width: 36px;
+    height: 36px;
+  }
+
+  .footer-logo .logo-text {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+
+  .footer-logo .logo-fides {
+    background: linear-gradient(135deg, #E63946 0%, #DC143C 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-family: 'Share Tech Mono', monospace;
+    font-weight: 400;
+    letter-spacing: 1px;
+  }
+
+  .footer-logo .logo-api {
+    background: linear-gradient(135deg, #C0C0C0 0%, #E8E8E8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-family: 'Saira Stencil One', cursive;
+    font-weight: 400;
+    letter-spacing: 2px;
+    font-size: 1.3em;
+    font-weight: 800;
+  }
+
+  .footer-text {
+    max-width: 600px;
+    margin: 0 auto 20px;
+    opacity: 0.8;
+    font-size: 14px;
+  }
+
+  .footer-copy {
+    opacity: 0.6;
+    font-size: 13px;
+  }
+
+  /* Scroll to Top */
+  .scroll-top {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 44px;
+    height: 44px;
+    background: linear-gradient(135deg, var(--gold) 0%, var(--red) 100%);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    font-size: 18px;
+    cursor: pointer;
+    opacity: 0;
+    visibility: hidden;
+    transition: var(--transition);
+    z-index: 999;
+    box-shadow: 0 4px 12px rgba(212, 175, 55, 0.4);
+  }
+
+  .scroll-top.visible {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .scroll-top:hover {
+    background: linear-gradient(135deg, var(--gold-dark) 0%, var(--red-dark) 100%);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 16px rgba(212, 175, 55, 0.6);
+  }
+
+  /* Animations */
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .reveal {
+    opacity: 0;
+    transform: translateY(40px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+
+  .reveal.active {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* Responsive */
+  @media (max-width: 968px) {
+    .nav-links {
+      display: none;
+    }
+
+    .mobile-menu-btn {
+      display: block;
+    }
+
+    .hero-title {
+      font-size: 36px;
+    }
+
+    .hero-subtitle {
+      font-size: 16px;
+    }
+
+    .hero-cta {
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .section {
+      padding: 60px 0;
+    }
+
+    .section-title {
+      font-size: 28px;
+    }
+
+    .section-subtitle {
+      font-size: 15px;
+    }
+
+    .diferencial-card {
+      flex: 0 1 calc(50% - 12px);
+    }
+
+    .contato-content {
+      grid-template-columns: 1fr;
+      gap: 32px;
+    }
+
+    .ex-tabs {
+      flex-wrap: wrap;
+      justify-content: stretch;
+    }
+
+    .ex-tab {
+      flex: 1 1 calc(50% - 4px);
+      min-width: calc(50% - 4px);
+      max-width: 50%;
+    }
+
+    .ex-panel-header {
+      padding: 14px 16px;
+    }
+
+    .ex-panel-title {
+      font-size: 18px;
+    }
+
+    .ex-panel-desc {
+      font-size: 12px;
+    }
+
+    .code-header {
+      grid-template-columns: 72px 1fr 72px;
+      padding: 10px 12px;
+    }
+
+    .code-dot {
+      width: 10px;
+      height: 10px;
+    }
+
+    .code-title {
+      font-size: 11px;
+      padding: 6px 10px;
+    }
+
+    .code-editor {
+      height: min(420px, 55vh);
+      min-height: 260px;
+      font-size: 13px;
+    }
+
+    .code-line {
+      grid-template-columns: 44px minmax(max-content, 1fr);
+    }
+
+    .code-line-number {
+      padding-right: 10px;
+    }
+
+    .code-line-code {
+      padding-left: 12px;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .hero {
+      padding-top: 80px;
+    }
+
+    .hero-title {
+      font-size: 28px;
+    }
+
+    .hero-subtitle {
+      font-size: 15px;
+    }
+
+    .section {
+      padding: 48px 0;
+    }
+
+    .section-title {
+      font-size: 24px;
+    }
+
+    .section-subtitle {
+      font-size: 14px;
+    }
+
+    .servicos-grid,
+    .planos-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .diferencial-card {
+      flex: 0 1 100%;
+    }
+
+    .diferenciais-grid {
+      justify-content: stretch;
+    }
+
+    .ex-tabs {
+      justify-content: stretch;
+    }
+
+    .ex-tab {
+      flex: 1 1 100%;
+      min-width: 100%;
+      max-width: 100%;
+    }
+
+    .ex-panel-header {
+      padding: 18px 24px;
+    }
+
+    .ex-panel-title {
+      font-size: 20px;
+    }
+
+    .ex-panel-desc {
+      font-size: 13px;
+    }
+
+    .code-header {
+      grid-template-columns: 62px 1fr 62px;
+      padding: 10px 12px;
+    }
+
+    .code-dot {
+      width: 12px;
+      height: 12px;
+    }
+
+    .code-title {
+      font-size: 11px;
+      padding: 6px 10px;
+    }
+
+    .code-editor {
+      height: min(480px, 58vh);
+      min-height: 280px;
+      font-size: 12.5px;
+    }
+
+    .code-line {
+      grid-template-columns: 40px minmax(max-content, 1fr);
+    }
+
+    .code-line-number {
+      padding-left: 8px;
+      padding-right: 8px;
+    }
+
+    .code-line-code {
+      padding-left: 10px;
+    }
+
+    .badge {
+      font-size: 13px;
+      padding: 8px 16px;
+    }
+
+    .badge i {
+      font-size: 16px;
+    }
+  }
+</style>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    // ── Reveal on scroll ──────────────────────────────────────────
+    const revealObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('active');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.1, rootMargin: '0px 0px -50px 0px' }
+    );
+    document.querySelectorAll('.reveal').forEach((el) => revealObserver.observe(el));
+
+    // ── Code tabs ─────────────────────────────────────────────────
+    const tabButtons = document.querySelectorAll('.ex-tab');
+    const tabPanels  = document.querySelectorAll('.ex-panel');
+
+    tabButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        const targetTab = button.getAttribute('data-tab');
+        if (!targetTab) return;
+
+        tabButtons.forEach((btn) => {
+          btn.classList.remove('active');
+          btn.setAttribute('aria-selected', 'false');
+        });
+        tabPanels.forEach((panel) => panel.classList.remove('active'));
+
+        button.classList.add('active');
+        button.setAttribute('aria-selected', 'true');
+        document.getElementById(targetTab)?.classList.add('active');
+      });
+    });
+
+    // ── FAQ accordion ─────────────────────────────────────────────
+    document.querySelectorAll('.faq-question').forEach((question) => {
+      question.addEventListener('click', () => {
+        const item     = question.parentElement;
+        const isActive = item.classList.contains('active');
+
+        document.querySelectorAll('.faq-item').forEach((i) => i.classList.remove('active'));
+
+        if (!isActive) item.classList.add('active');
+      });
+    });
+
+    // ── Scroll suave → contato ────────────────────────────────────
+    const contatoSection = document.getElementById('contato');
+
+    function scrollToContato() {
+      contatoSection?.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    document.getElementById('btnHero')?.addEventListener('click', scrollToContato);
+    document.getElementById('btnContatoNav')?.addEventListener('click', scrollToContato);
+    document.querySelectorAll('.btn-plano').forEach((btn) =>
+      btn.addEventListener('click', scrollToContato)
+    );
+
+    // ── Formulário de contato ─────────────────────────────────────
+    document.getElementById('formContato')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+
+      const nome     = (document.getElementById('nome') as HTMLInputElement).value.trim();
+      const email    = (document.getElementById('email') as HTMLInputElement).value.trim();
+      const mensagem = (document.getElementById('mensagem') as HTMLTextAreaElement).value.trim();
+
+      if (nome && email && mensagem) {
+        alert(`Mensagem enviada com sucesso!\n\nObrigado, ${nome}! Entraremos em contato em breve pelo e-mail ${email}.`);
+        (e.target as HTMLFormElement).reset();
+      } else {
+        alert('Por favor, preencha todos os campos obrigatórios.');
+      }
+    });
+
+    // ── Scroll to Top ─────────────────────────────────────────────
+    const scrollTopBtn = document.getElementById('scrollTop');
+
+    window.addEventListener('scroll', () => {
+      scrollTopBtn?.classList.toggle('visible', window.scrollY > 500);
+    });
+
+    scrollTopBtn?.addEventListener('click', () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    // ── Ano atual no rodapé ───────────────────────────────────────
+    const anoEl = document.getElementById('anoAtual');
+    if (anoEl) anoEl.textContent = String(new Date().getFullYear());
+
+    // ── Mobile menu ───────────────────────────────────────────────
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    const navLinks      = document.querySelector('.nav-links') as HTMLElement | null;
+
+    mobileMenuBtn?.addEventListener('click', () => {
+      if (!navLinks) return;
+
+      const isOpen = navLinks.style.display === 'flex';
+      navLinks.style.display = isOpen ? 'none' : 'flex';
+
+      if (!isOpen) {
+        Object.assign(navLinks.style, {
+          position:        'absolute',
+          top:             '80px',
+          left:            '0',
+          right:           '0',
+          background:      '#000000',
+          flexDirection:   'column',
+          padding:         '20px',
+          boxShadow:       '0 10px 30px rgba(0,0,0,0.3)',
+        });
+      }
+    });
+
+    document.querySelectorAll('.nav-links a').forEach((link) => {
+      link.addEventListener('click', () => {
+        if (window.innerWidth <= 968 && navLinks) {
+          navLinks.style.display = 'none';
+        }
+      });
+    });
+  });
+</script>
+
+</body>
 </html>
