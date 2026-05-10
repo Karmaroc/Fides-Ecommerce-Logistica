@@ -1088,55 +1088,6 @@ const faqs = [
       </div>
     </section>
 
-    <script>
-      setTimeout(() => {
-        const toggleBtn = document.getElementById("toggleFaq");
-        const faqWrapper = document.getElementById("faqWrapper");
-        const questions = document.querySelectorAll(".faq-question");
-
-        console.log("FAQ Script started - Found questions:", questions.length);
-
-        if (toggleBtn && faqWrapper) {
-          toggleBtn.addEventListener("click", () => {
-            faqWrapper.classList.toggle("show");
-            toggleBtn.textContent = faqWrapper.classList.contains("show")
-              ? "Ocultar FAQ"
-              : "Mostrar FAQ";
-          });
-        }
-
-        questions.forEach((question, index) => {
-          question.addEventListener("click", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-
-            let item = question.parentElement;
-            console.log("Question clicked:", index);
-            console.log("Parent element:", item);
-            console.log("Parent classes before:", item.className);
-
-            if (!item) return;
-
-            const allItems = document.querySelectorAll(".faq-item");
-
-            // Remove active de todos
-            allItems.forEach((el) => {
-              el.classList.remove("active");
-            });
-
-            // Sempre adiciona (nunca toggle)
-            item.classList.add("active");
-
-            console.log("Parent classes after:", item.className);
-            console.log(
-              "Has active class now:",
-              item.classList.contains("active")
-            );
-            console.log("Item HTML:", item.outerHTML.substring(0, 200));
-          });
-        });
-      }, 100);
-    </script>
 
     <!-- Contato Section -->
     <section id="contato" class="section contato">
@@ -3280,6 +3231,19 @@ const faqs = [
             if (!isActive) item.classList.add("active");
           });
         });
+
+        // Toggle Expand FAQ Wrapper
+        const toggleBtn = document.getElementById("toggleFaq");
+        const faqWrapper = document.getElementById("faqWrapper");
+
+        if (toggleBtn && faqWrapper) {
+          toggleBtn.addEventListener("click", () => {
+            faqWrapper.classList.toggle("show");
+            toggleBtn.textContent = faqWrapper.classList.contains("show")
+              ? "Ocultar FAQ"
+              : "Mostrar FAQ";
+          });
+        }
 
         // ── Scroll suave → contato ────────────────────────────────────
         const contatoSection = document.getElementById("contato");
