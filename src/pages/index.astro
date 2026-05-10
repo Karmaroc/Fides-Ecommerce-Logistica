@@ -3169,7 +3169,7 @@ const faqs = [
 
         langBtns.forEach((btn) => {
           btn.addEventListener("click", () => {
-            const lang = btn.dataset.lang;
+            const lang = btn.getAttribute("data-lang");
             if (!lang) return;
 
             langBtns.forEach((item) => {
@@ -3204,8 +3204,8 @@ const faqs = [
 
         tabButtons.forEach((tab) => {
           tab.addEventListener("click", () => {
-            const targetId = tab.dataset.tab;
-            const lang = tab.dataset.lang;
+            const targetId = tab.getAttribute("data-tab");
+            const lang = tab.getAttribute("data-lang");
             if (!targetId || !lang) return;
 
             document
