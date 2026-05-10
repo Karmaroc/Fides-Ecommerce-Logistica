@@ -3223,20 +3223,36 @@ const faqs = [
 
             tab.classList.add("active");
             tab.setAttribute("aria-selected", "true");
-            document
-              .querySelector(`.panel[data-panel="${targetId}"]`)
-              ?.classList.add("active");
+            
+            const targetPanel = document.querySelector(`.panel[data-panel="${targetId}"]`);
+            if (targetPanel) {
+              targetPanel.classList.add("active");
+            }
           });
         });
 
         document.querySelectorAll(".btn-copy").forEach((button) => {
           button.addEventListener("click", async () => {
             const windowEl = button.closest(".window");
-            const panel = windowEl?.querySelector(".panel.active");
-            const code = panel?.dataset.code ?? "";
+            if (!windowEl) return;
+            const panel = windowEl.querySelector(".panel.active");
+            if (!panel) return;
+            
+            const code = panel.getAttribute("data-code") || "";
 
             try {
-              await navigator.clipboard.writeText(code);
+              if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(code);
+              } else {
+                // Fallback for older browsers
+                const textArea = document.createElement("textarea");
+                textArea.value = code;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand("copy");
+                document.body.removeChild(textArea);
+              }
+              
               button.classList.add("copied");
               const label = button.querySelector("span");
               if (label) label.textContent = "Copiado!";
@@ -3254,6 +3270,7 @@ const faqs = [
         document.querySelectorAll(".faq-question").forEach((question) => {
           question.addEventListener("click", () => {
             const item = question.parentElement;
+            if (!item) return;
             const isActive = item.classList.contains("active");
 
             document
